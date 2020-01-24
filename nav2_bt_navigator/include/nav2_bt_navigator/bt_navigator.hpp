@@ -29,6 +29,10 @@
 #include "tf2_ros/transform_listener.h"
 #include "tf2_ros/create_timer_ros.h"
 
+#ifdef ZMQ_FOUND
+#include "behaviortree_cpp_v3/loggers/bt_zmq_publisher.h"
+#endif
+
 namespace nav2_bt_navigator
 {
 /**
@@ -121,6 +125,11 @@ protected:
 
   // The complete behavior tree that results from parsing the incoming XML
   std::unique_ptr<BT::Tree> tree_;
+
+#ifdef ZMQ_FOUND
+  // The behavior tree publisher
+  std::unique_ptr<BT::PublisherZMQ> publisher_;
+#endif
 
   // Libraries to pull plugins (BT Nodes) from
   std::vector<std::string> plugin_lib_names_;

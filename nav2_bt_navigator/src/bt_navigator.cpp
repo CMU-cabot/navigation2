@@ -119,6 +119,10 @@ BtNavigator::on_configure(const rclcpp_lifecycle::State & /*state*/)
   tree_ = std::make_unique<BT::Tree>();
   tree_->root_node = temp_tree.root_node;
   tree_->nodes = std::move(temp_tree.nodes);
+#ifdef ZMQ_FOUND
+  tree_->manifests = temp_tree.manifests;
+  publisher_ = std::make_unique<BT::PublisherZMQ>(*tree_);
+#endif
   temp_tree.root_node = nullptr;
 
   return nav2_util::CallbackReturn::SUCCESS;
