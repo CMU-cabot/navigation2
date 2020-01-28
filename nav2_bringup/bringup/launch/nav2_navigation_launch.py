@@ -47,7 +47,9 @@ def generate_launch_description():
     remappings = [((namespace, '/tf'), '/tf'),
                   ((namespace, '/tf_static'), '/tf_static'),
                   ('/tf', 'tf'),
-                  ('/tf_static', 'tf_static')]
+                  ('/tf_static', 'tf_static'),
+                  ('/cmd_vel', '/cabot/raw_cmd_vel'),
+    ]
 
     # Create our own temporary YAML files that include substitutions
     param_substitutions = {

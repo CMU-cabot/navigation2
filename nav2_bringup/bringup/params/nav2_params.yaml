@@ -72,6 +72,7 @@ bt_navigator_rclcpp_node:
 
 controller_server:
   ros__parameters:
+    controller_frequency: 5
     use_sim_time: True
     debug_trajectory_details: True
     min_vel_x: 0.0
@@ -124,7 +125,8 @@ local_costmap:
       width: 3
       height: 3
       resolution: 0.05
-      plugin_names: ["obstacle_layer", "voxel_layer", "inflation_layer"]
+      plugin_names: ["obstacle_layer", "inflation_layer"]
+#      plugin_names: ["obstacle_layer", "voxel_layer", "inflation_layer"]
       plugin_types: ["nav2_costmap_2d::ObstacleLayer", "nav2_costmap_2d::VoxelLayer", "nav2_costmap_2d::InflationLayer"]
       robot_radius: 0.22
       inflation_layer:
@@ -171,7 +173,8 @@ global_costmap:
       robot_base_frame: base_link
       global_frame: map
       use_sim_time: True
-      plugin_names: ["static_layer", "obstacle_layer", "voxel_layer", "inflation_layer"]
+#      plugin_names: ["static_layer", "obstacle_layer", "voxel_layer", "inflation_layer"]
+      plugin_names: ["static_layer", "obstacle_layer", "inflation_layer"]
       plugin_types: ["nav2_costmap_2d::StaticLayer", "nav2_costmap_2d::ObstacleLayer", "nav2_costmap_2d::VoxelLayer", "nav2_costmap_2d::InflationLayer"]
       robot_radius: 0.22
       resolution: 0.05
