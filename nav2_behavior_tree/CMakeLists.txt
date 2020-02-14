@@ -18,6 +18,13 @@ find_package(std_msgs REQUIRED)
 find_package(std_srvs REQUIRED)
 find_package(nav2_util REQUIRED)
 
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH}  "${CMAKE_CURRENT_LIST_DIR}/cmake")
+find_package(ZMQ)
+if( ZMQ_FOUND )
+  message(STATUS "ZeroMQ found.")
+  add_definitions( -DZMQ_FOUND )
+endif()
+
 nav2_package()
 
 include_directories(

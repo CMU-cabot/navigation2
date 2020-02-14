@@ -48,6 +48,9 @@ BehaviorTreeEngine::run(
   while (rclcpp::ok() && result == BT::NodeStatus::RUNNING) {
     if (cancelRequested()) {
       tree->root_node->halt();
+#ifdef ZMQ_FOUND
+      publisher_ = nullptr;
+#endif  
       return BtStatus::CANCELED;
     }
 
@@ -57,7 +60,9 @@ BehaviorTreeEngine::run(
 
     loopRate.sleep();
   }
-
+#ifdef ZMQ_FOUND
+  publisher_ = nullptr;
+#endif  
   return (result == BT::NodeStatus::SUCCESS) ? BtStatus::SUCCEEDED : BtStatus::FAILED;
 }
 
@@ -66,9 +71,11 @@ BehaviorTreeEngine::buildTreeFromText(
   const std::string & xml_string,
   BT::Blackboard::Ptr blackboard)
 {
-  BT::XMLParser p(factory_);
-  p.loadFromText(xml_string);
-  return p.instantiateTree(blackboard);
+  auto tree = factory_.createTreeFromText(xml_string, blackboard);
+#ifdef ZMQ_FOUND
+  publisher_ = std::make_unique<BT::PublisherZMQ>(tree);
+#endif  
+  return tree;
 }
 
 }  // namespace nav2_behavior_tree

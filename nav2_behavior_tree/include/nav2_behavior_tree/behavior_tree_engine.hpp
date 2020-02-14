@@ -23,6 +23,10 @@
 #include "behaviortree_cpp_v3/bt_factory.h"
 #include "behaviortree_cpp_v3/xml_parsing.h"
 
+#ifdef ZMQ_FOUND
+#include "behaviortree_cpp_v3/loggers/bt_zmq_publisher.h"
+#endif
+
 namespace nav2_behavior_tree
 {
 
@@ -66,6 +70,11 @@ public:
 protected:
   // The factory that will be used to dynamically construct the behavior tree
   BT::BehaviorTreeFactory factory_;
+
+#ifdef ZMQ_FOUND
+  // The behavior tree publisher
+  std::unique_ptr<BT::PublisherZMQ> publisher_;
+#endif
 };
 
 }  // namespace nav2_behavior_tree
