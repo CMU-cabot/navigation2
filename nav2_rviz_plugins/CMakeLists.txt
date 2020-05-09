@@ -93,13 +93,13 @@ target_compile_definitions(${library_name} PUBLIC "PLUGINLIB__DISABLE_BOOST_FUNC
 pluginlib_export_plugin_description_file(rviz_common plugins_description.xml)
 
 install(
-  TARGETS ${library_name}
+  TARGETS ${library_name} tinyxml2_vendor
   EXPORT ${library_name}
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin
   INCLUDES DESTINATION include
-)
+  )
 
 install(
   DIRECTORY include/
