@@ -73,15 +73,8 @@ BtNavigator::on_configure(const rclcpp_lifecycle::State & /*state*/)
 {
   RCLCPP_INFO(get_logger(), "Configuring");
 
-  auto options = rclcpp::NodeOptions().arguments(
-    {"--ros-args",
-      "-r", std::string("__node:=") + get_name() + "_client_node",
-      "--"});
-  // Support for handling the topic-based goal pose from rviz
-  client_node_ = std::make_shared<rclcpp::Node>("_", options);
-
   self_client_ = rclcpp_action::create_client<nav2_msgs::action::NavigateToPose>(
-    client_node_, "navigate_to_pose");
+    rclcpp_node_, "navigate_to_pose");
 
   tf_ = std::make_shared<tf2_ros::Buffer>(get_clock());
   auto timer_interface = std::make_shared<tf2_ros::CreateTimerROS>(
@@ -114,7 +107,7 @@ BtNavigator::on_configure(const rclcpp_lifecycle::State & /*state*/)
   blackboard_ = BT::Blackboard::create();
 
   // Put items on the blackboard
-  blackboard_->set<rclcpp::Node::SharedPtr>("node", client_node_);  // NOLINT
+  blackboard_->set<rclcpp::Node::SharedPtr>("node", rclcpp_node_);  // NOLINT
   blackboard_->set<std::shared_ptr<tf2_ros::Buffer>>("tf_buffer", tf_);  // NOLINT
   blackboard_->set<std::chrono::milliseconds>("server_timeout", std::chrono::milliseconds(10));  // NOLINT
   blackboard_->set<bool>("path_updated", false);  // NOLINT
@@ -174,7 +167,6 @@ BtNavigator::on_cleanup(const rclcpp_lifecycle::State & /*state*/)
   // TODO(orduno) Fix the race condition between the worker thread ticking the tree
   //              and the main thread resetting the resources, see #1344
   goal_sub_.reset();
-  client_node_.reset();
   self_client_.reset();
 
   // Reset the listener before the buffer
@@ -225,7 +217,7 @@ BtNavigator::navigateToPose()
       return action_server_->is_cancel_requested();
     };
 
-  RosTopicLogger topic_logger(client_node_, tree_);
+  RosTopicLogger topic_logger(rclcpp_node_, tree_);
   std::shared_ptr<Action::Feedback> feedback_msg = std::make_shared<Action::Feedback>();
 
   auto on_loop = [&]() {
