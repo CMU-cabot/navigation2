@@ -137,11 +137,11 @@ public:
     }
 
     // The following code corresponds to the "RUNNING" loop
-    auto goal_status = goal_handle_->get_status();
     if (rclcpp::ok() && !goal_result_available_) {
       // user defined callback. May modify the value of "goal_updated_"
       on_wait_for_result();
 
+      auto goal_status = goal_handle_->get_status();
       if (goal_updated_ && (goal_status == action_msgs::msg::GoalStatus::STATUS_EXECUTING ||
         goal_status == action_msgs::msg::GoalStatus::STATUS_ACCEPTED))
       {
@@ -164,10 +164,11 @@ public:
 
       case rclcpp_action::ResultCode::ABORTED:
         // TODO #1652 use PREEMPTED once rcl_action is updated
-        if (goal_status == action_msgs::msg::GoalStatus::STATUS_ABORTED) {
+        if (goal_handle_->get_status() == action_msgs::msg::GoalStatus::STATUS_ABORTED) {
           return on_aborted();
         }
         // guess it is PREEMPTED because goal_status was replaced with a new goal
+        goal_result_available_ = false;
         return BT::NodeStatus::RUNNING;
 
       case rclcpp_action::ResultCode::CANCELED:
