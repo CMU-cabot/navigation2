@@ -22,6 +22,8 @@
 #include <vector>
 #include <set>
 
+#include "ament_index_cpp/get_package_prefix.hpp"
+#include "ament_index_cpp/get_package_share_directory.hpp"
 #include "nav2_util/geometry_utils.hpp"
 #include "nav2_util/robot_utils.hpp"
 #include "nav2_behavior_tree/bt_conversions.hpp"
@@ -147,11 +149,38 @@ BtNavigator::loadBehaviorTree(const std::string & bt_xml_filename)
     return true;
   }
 
+  // resolve package:// path
+  std::string resolved_filename = bt_xml_filename;
+  if (resolved_filename.find("package://") == 0) {
+    resolved_filename.erase(0, strlen("package://"));
+    size_t pos = resolved_filename.find("/");
+    if (pos == std::string::npos) {
+      RCLCPP_ERROR(get_logger(), "Could not parse %s", resolved_filename.c_str());
+      return false;
+    }
+
+    std::string package = resolved_filename.substr(0, pos);
+    resolved_filename.erase(0, pos);
+    std::string package_path;
+    try {
+      package_path = ament_index_cpp::get_package_share_directory(package);
+    } catch (const ament_index_cpp::PackageNotFoundError &) {
+      RCLCPP_ERROR(
+        get_logger(), "Package [%s] does not exist (%s)",
+        package.c_str(), resolved_filename.c_str());
+      return false;
+    }
+
+    resolved_filename = package_path + resolved_filename;
+  }
+
   // Read the input BT XML from the specified file into a string
-  std::ifstream xml_file(bt_xml_filename);
+  std::ifstream xml_file(resolved_filename);
 
   if (!xml_file.good()) {
-    RCLCPP_ERROR(get_logger(), "Couldn't open input XML file: %s", bt_xml_filename.c_str());
+    RCLCPP_ERROR(
+      get_logger(), "Couldn't open input XML file: %s (%s)",
+      resolved_filename.c_str(), bt_xml_filename.c_str());
     return false;
   }
 
@@ -164,7 +193,7 @@ BtNavigator::loadBehaviorTree(const std::string & bt_xml_filename)
 
   // Create the Behavior Tree from the XML input
   tree_ = bt_->buildTreeFromText(xml_string, blackboard_);
-  current_bt_xml_filename_ = bt_xml_filename;
+  current_bt_xml_filename_ = resolved_filename;
 
   return true;
 }
