@@ -248,6 +248,9 @@ PlannerServer::computePlan()
       goal = action_server_->accept_pending_goal();
     }
 
+    // get lock of costmap to make sure it is not updating while making a plan
+    std::unique_lock<nav2_costmap_2d::Costmap2D::mutex_t> lock(*(costmap_->getMutex()));
+
     RCLCPP_DEBUG(
       get_logger(), "Attempting to a find path from (%.2f, %.2f) to "
       "(%.2f, %.2f).", start.pose.position.x, start.pose.position.y,
