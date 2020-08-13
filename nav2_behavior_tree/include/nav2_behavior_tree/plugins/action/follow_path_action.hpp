@@ -35,6 +35,12 @@ public:
 
   void on_wait_for_result() override;
 
+  BT::NodeStatus on_success() override;
+
+  BT::NodeStatus on_aborted() override;
+
+  BT::NodeStatus on_cancelled() override;
+
   static BT::PortsList providedPorts()
   {
     return providedBasicPorts(

@@ -49,6 +49,24 @@ void FollowPathAction::on_wait_for_result()
   }
 }
 
+BT::NodeStatus FollowPathAction::on_success()
+{
+  config().blackboard->set<rclcpp::Time>("path_last_updated", rclcpp::Time(0)); // NOLINT
+  return BtActionNode::on_success();
+}
+
+BT::NodeStatus FollowPathAction::on_aborted()
+{
+  config().blackboard->set<rclcpp::Time>("path_last_updated", rclcpp::Time(0)); // NOLINT
+  return BtActionNode::on_aborted();
+}
+
+BT::NodeStatus FollowPathAction::on_cancelled()
+{
+  config().blackboard->set<rclcpp::Time>("path_last_updated", rclcpp::Time(0)); // NOLINT
+  return BtActionNode::on_cancelled();
+}
+
 }  // namespace nav2_behavior_tree
 
 #include "behaviortree_cpp_v3/bt_factory.h"

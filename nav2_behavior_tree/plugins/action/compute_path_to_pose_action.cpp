@@ -26,6 +26,7 @@ ComputePathToPoseAction::ComputePathToPoseAction(
   const BT::NodeConfiguration & conf)
 : BtActionNode<nav2_msgs::action::ComputePathToPose>(xml_tag_name, action_name, conf)
 {
+  config().blackboard->set<rclcpp::Time>("path_last_updated", rclcpp::Time(0)); // NOLINT
 }
 
 void ComputePathToPoseAction::on_tick()
@@ -37,12 +38,14 @@ void ComputePathToPoseAction::on_tick()
 BT::NodeStatus ComputePathToPoseAction::on_success()
 {
   setOutput("path", result_.result->path);
+  rclcpp::Time now = node_->get_clock()->now();
+  rclcpp::Time last_updated = config().blackboard->get<rclcpp::Time>("path_last_updated");
 
-  if (first_time_) {
-    first_time_ = false;
-  } else {
+  if (last_updated.nanoseconds() != 0 && now > last_updated) {
     config().blackboard->set("path_updated", true);
   }
+  config().blackboard->set("path_last_updated", now);
+
   return BT::NodeStatus::SUCCESS;
 }
 
