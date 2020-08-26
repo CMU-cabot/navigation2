@@ -21,6 +21,7 @@
 #include <thread>
 #include <future>
 #include <chrono>
+#include <algorithm>
 
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_action/rclcpp_action.hpp"
@@ -79,8 +80,6 @@ public:
     const rclcpp_action::GoalUUID & /*uuid*/,
     std::shared_ptr<const typename ActionT::Goal>/*goal*/)
   {
-    std::lock_guard<std::recursive_mutex> lock(update_mutex_);
-
     if (!server_active_) {
       return rclcpp_action::GoalResponse::REJECT;
     }
@@ -92,7 +91,6 @@ public:
   rclcpp_action::CancelResponse handle_cancel(
     const std::shared_ptr<rclcpp_action::ServerGoalHandle<ActionT>>/*handle*/)
   {
-    std::lock_guard<std::recursive_mutex> lock(update_mutex_);
     debug_msg("Received request for goal cancellation");
     return rclcpp_action::CancelResponse::ACCEPT;
   }
@@ -101,37 +99,22 @@ public:
   {
     std::lock_guard<std::recursive_mutex> lock(update_mutex_);
     debug_msg("Receiving a new goal");
+    goal_handles_queue_.push_back(handle);
+    auto current_handle = goal_handles_queue_[0];
+    auto size = goal_handles_queue_.size();
 
-    if (is_active(current_handle_) || is_running()) {
-      debug_msg("An older goal is active, moving the new goal to a pending slot.");
-
-      if (is_active(pending_handle_)) {
-        debug_msg(
-          "The pending slot is occupied."
-          " The previous pending goal will be terminated and replaced.");
-        terminate(pending_handle_);
-      }
-      pending_handle_ = handle;
-      preempt_requested_ = true;
-    } else {
-      if (is_active(pending_handle_)) {
-        // Shouldn't reach a state with a pending goal but no current one.
-        error_msg("Forgot to handle a preemption. Terminating the pending goal.");
-        terminate(pending_handle_);
-        preempt_requested_ = false;
-      }
-
-      current_handle_ = handle;
-
+    if (size == 1) {
       // Return quickly to avoid blocking the executor, so spin up a new thread
       debug_msg("Executing goal asynchronously.");
+      current_handle_ = current_handle;
       execution_future_ = std::async(std::launch::async, [this]() {work();});
     }
   }
 
   void work()
   {
-    while (rclcpp::ok() && !stop_execution_ && is_active(current_handle_)) {
+    while (rclcpp::ok() && !stop_execution_ && is_active(current_handle_))
+    {
       debug_msg("Executing the goal...");
       try {
         execute_callback_();
@@ -143,28 +126,30 @@ public:
         return;
       }
 
-      debug_msg("Blocking processing of new goal handles.");
-      std::lock_guard<std::recursive_mutex> lock(update_mutex_);
-
+      // this should be used in the subclasses to be stopped
       if (stop_execution_) {
         warn_msg("Stopping the thread per request.");
         terminate_all();
         break;
       }
 
+      std::unique_lock<std::recursive_mutex> lock(goal_mutex_);
       if (is_active(current_handle_)) {
         warn_msg("Current goal was not completed successfully.");
         terminate(current_handle_);
       }
+      lock.unlock();
 
-      if (is_active(pending_handle_)) {
-        debug_msg("Executing a pending handle on the existing thread.");
-        accept_pending_goal();
-      } else {
-        debug_msg("Done processing available goals.");
-        break;
+      if (is_preempt_requested()) {
+	accept_pending_goal();
       }
     }
+
+    std::unique_lock<std::recursive_mutex> lock(update_mutex_);
+    erase_handle(current_handle_);
+    current_handle_.reset();
+    lock.unlock();
+    
     debug_msg("Worker thread done.");
   }
 
@@ -217,35 +202,42 @@ public:
 
   bool is_server_active()
   {
-    std::lock_guard<std::recursive_mutex> lock(update_mutex_);
     return server_active_;
   }
 
   bool is_preempt_requested() const
   {
     std::lock_guard<std::recursive_mutex> lock(update_mutex_);
-    return preempt_requested_;
+    return goal_handles_queue_.size() > 1;
   }
 
   const std::shared_ptr<const typename ActionT::Goal> accept_pending_goal()
   {
-    std::lock_guard<std::recursive_mutex> lock(update_mutex_);
-
-    if (!pending_handle_ || !pending_handle_->is_active()) {
+    if (!is_preempt_requested()) {
       error_msg("Attempting to get pending goal when not available");
       return std::shared_ptr<const typename ActionT::Goal>();
     }
 
-    if (is_active(current_handle_) && current_handle_ != pending_handle_) {
-      debug_msg("Cancelling the previous goal");
-      current_handle_->abort(empty_result());
+
+    do {
+      std::unique_lock<std::recursive_mutex> lock(goal_mutex_);
+      if (is_active(current_handle_)) {
+	current_handle_->abort(empty_result());
+      }
+      lock.unlock();
+      
+      std::unique_lock<std::recursive_mutex> lock2(update_mutex_);
+      erase_handle(current_handle_);
+      current_handle_ = get_next_handle();
+      lock2.unlock();
+    } while(is_preempt_requested());
+
+    if (!is_active(current_handle_)) {
+      error_msg("Attempting to get pending goal when not available");
+      return std::shared_ptr<const typename ActionT::Goal>();      
     }
 
-    current_handle_ = pending_handle_;
-    pending_handle_.reset();
-    preempt_requested_ = false;
-
-    debug_msg("Preempted goal");
+    info_msg("Preempted goal");
 
     return current_handle_->get_goal();
   }
@@ -266,53 +258,66 @@ public:
   {
     std::lock_guard<std::recursive_mutex> lock(update_mutex_);
 
-    // A cancel request is assumed if either handle is canceled by the client.
-
-    if (current_handle_ == nullptr) {
-      error_msg("Checking for cancel but current goal is not available");
-      return false;
+    bool result = true;
+    for(auto handle : goal_handles_queue_) {
+      result = result && handle->is_canceling();
     }
 
-    if (pending_handle_ != nullptr) {
-      return pending_handle_->is_canceling();
-    }
-
-    return current_handle_->is_canceling();
+    return result;
   }
 
   void terminate_all(
     typename std::shared_ptr<typename ActionT::Result> result =
     std::make_shared<typename ActionT::Result>())
   {
-    std::lock_guard<std::recursive_mutex> lock(update_mutex_);
-    terminate(current_handle_, result);
-    terminate(pending_handle_, result);
-    preempt_requested_ = false;
+
+    while(current_handle_ != nullptr) {
+      std::unique_lock<std::recursive_mutex> lock(goal_mutex_);
+      terminate(current_handle_, result);
+      lock.unlock();
+      
+      std::unique_lock<std::recursive_mutex> lock2(update_mutex_);
+      erase_handle(current_handle_);
+      current_handle_ = get_next_handle();
+      lock2.unlock();
+    }
   }
 
   void terminate_current(
     typename std::shared_ptr<typename ActionT::Result> result =
     std::make_shared<typename ActionT::Result>())
   {
-    std::lock_guard<std::recursive_mutex> lock(update_mutex_);
+    std::unique_lock<std::recursive_mutex> lock(goal_mutex_);
     terminate(current_handle_, result);
+    lock.unlock();
+
+    std::unique_lock<std::recursive_mutex> lock2(update_mutex_);
+    erase_handle(current_handle_);
+    current_handle_.reset();
+    lock2.unlock();
   }
 
   void succeeded_current(
     typename std::shared_ptr<typename ActionT::Result> result =
     std::make_shared<typename ActionT::Result>())
   {
-    std::lock_guard<std::recursive_mutex> lock(update_mutex_);
-
+    std::unique_lock<std::recursive_mutex> lock(goal_mutex_);
     if (is_active(current_handle_)) {
       debug_msg("Setting succeed on current goal.");
       current_handle_->succeed(result);
-      current_handle_.reset();
     }
+    lock.unlock();
+    
+    std::unique_lock<std::recursive_mutex> lock2(update_mutex_);
+    erase_handle(current_handle_);
+    current_handle_.reset();
+    lock2.unlock();
   }
 
   void publish_feedback(typename std::shared_ptr<typename ActionT::Feedback> feedback)
   {
+    std::lock_guard<std::recursive_mutex> lock(goal_mutex_);
+
     if (!is_active(current_handle_)) {
       error_msg("Trying to publish feedback when the current goal handle is not active");
       return;
@@ -334,18 +339,38 @@ protected:
   bool stop_execution_{false};
 
   mutable std::recursive_mutex update_mutex_;
+  mutable std::recursive_mutex goal_mutex_;
   bool server_active_{false};
-  bool preempt_requested_{false};
   std::chrono::milliseconds server_timeout_;
 
+  
   std::shared_ptr<rclcpp_action::ServerGoalHandle<ActionT>> current_handle_;
-  std::shared_ptr<rclcpp_action::ServerGoalHandle<ActionT>> pending_handle_;
+  std::vector<std::shared_ptr<rclcpp_action::ServerGoalHandle<ActionT>>> goal_handles_queue_;
 
   typename rclcpp_action::Server<ActionT>::SharedPtr action_server_;
 
   constexpr auto empty_result() const
   {
     return std::make_shared<typename ActionT::Result>();
+  }
+
+  constexpr std::shared_ptr<rclcpp_action::ServerGoalHandle<ActionT>> get_next_handle() const
+  {    
+    std::lock_guard<std::recursive_mutex> lock(update_mutex_);
+    if (goal_handles_queue_.size() == 0) {
+      return nullptr;
+    }
+
+    return goal_handles_queue_[0];
+  }
+
+  void erase_handle(const std::shared_ptr<rclcpp_action::ServerGoalHandle<ActionT>> handle)
+  {    
+    std::lock_guard<std::recursive_mutex> lock(update_mutex_);
+
+    if (goal_handles_queue_[0] == handle) {
+      goal_handles_queue_.erase(goal_handles_queue_.begin());
+    }
   }
 
   constexpr bool is_active(
@@ -369,7 +394,6 @@ protected:
         warn_msg("Aborting handle.");
         handle->abort(result);
       }
-      handle.reset();
     }
   }
 
