@@ -638,6 +638,8 @@ NavFn::propNavFnDijkstra(int cycles, bool atStart)
     }
   }
 
+  last_path_cost_ = potarr[startCell];
+
   RCLCPP_DEBUG(
     rclcpp::get_logger("rclcpp"),
     "[NavFn] Used %d cycles, %d cells visited (%d%%), priority buf max %d\n",
