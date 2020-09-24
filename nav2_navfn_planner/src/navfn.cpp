@@ -108,7 +108,7 @@ create_nav_plan_astar(
 // create nav fn buffers
 //
 
-NavFn::NavFn(int xs, int ys)
+NavFn::NavFn(int xs, int ys, int cost_neutral, double cost_factor)
 {
   // create cell arrays
   costarr = NULL;
@@ -116,6 +116,8 @@ NavFn::NavFn(int xs, int ys)
   pending = NULL;
   gradx = grady = NULL;
   setNavArr(xs, ys);
+  cost_neutral_ = cost_neutral;
+  cost_factor_ = cost_factor;
 
   // priority buffers
   pb1 = new int[PRIORITYBUFSIZE];
@@ -124,7 +126,7 @@ NavFn::NavFn(int xs, int ys)
 
   // for Dijkstra (breadth-first), set to COST_NEUTRAL
   // for A* (best-first), set to COST_NEUTRAL
-  priInc = 2 * COST_NEUTRAL;
+  priInc = 2 * cost_neutral_;
 
   // goal and start
   goal[0] = goal[1] = 0;
@@ -257,7 +259,7 @@ NavFn::setCostmap(const COSTTYPE * cmap, bool isROS, bool allow_unknown)
         *cm = COST_OBS;
         int v = *cmap;
         if (v < COST_OBS_ROS) {
-          v = COST_NEUTRAL + COST_FACTOR * v;
+          v = cost_neutral_ + cost_factor_ * v;
           if (v >= COST_OBS) {
             v = COST_OBS - 1;
           }
@@ -278,7 +280,7 @@ NavFn::setCostmap(const COSTTYPE * cmap, bool isROS, bool allow_unknown)
         }
         int v = *cmap;
         if (v < COST_OBS_ROS) {
-          v = COST_NEUTRAL + COST_FACTOR * v;
+          v = cost_neutral_ + cost_factor_ * v;
           if (v >= COST_OBS) {
             v = COST_OBS - 1;
           }
@@ -344,7 +346,7 @@ NavFn::setupNavFn(bool keepit)
   for (int i = 0; i < ns; i++) {
     potarr[i] = POT_HIGH;
     if (!keepit) {
-      costarr[i] = COST_NEUTRAL;
+      costarr[i] = cost_neutral_;
     }
     gradx[i] = grady[i] = 0.0;
   }
@@ -544,7 +546,7 @@ NavFn::updateCellAstar(int n)
       // calculate distance
       int x = n % nx;
       int y = n / nx;
-      float dist = hypot(x - start[0], y - start[1]) * static_cast<float>(COST_NEUTRAL);
+      float dist = hypot(x - start[0], y - start[1]) * static_cast<float>(cost_neutral_);
 
       potarr[n] = pot;
       pot += dist;
@@ -661,7 +663,7 @@ NavFn::propNavFnAstar(int cycles)
   int cycle = 0;  // which cycle we're on
 
   // set initial threshold, based on distance
-  float dist = hypot(goal[0] - start[0], goal[1] - start[1]) * static_cast<float>(COST_NEUTRAL);
+  float dist = hypot(goal[0] - start[0], goal[1] - start[1]) * static_cast<float>(cost_neutral_);
   curT = dist + curT;
 
   // set up start cell
@@ -785,7 +787,7 @@ NavFn::calcPath(int n, int * st)
       std::min(
         nx * ny - 1, stc + static_cast<int>(round(dx)) +
         static_cast<int>(nx * round(dy))));
-    if (potarr[nearest_point] < COST_NEUTRAL) {
+    if (potarr[nearest_point] < cost_neutral_) {
       pathx[npath] = static_cast<float>(goal[0]);
       pathy[npath] = static_cast<float>(goal[1]);
       return ++npath;  // done!

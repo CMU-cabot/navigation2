@@ -223,6 +223,9 @@ protected:
    * @param event ParameterEvent message
    */
   void on_parameter_event_callback(const rcl_interfaces::msg::ParameterEvent::SharedPtr event);
+
+  int cost_neutral_;
+  double cost_factor_;
 };
 
 }  // namespace nav2_navfn_planner

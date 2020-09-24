@@ -62,8 +62,8 @@ namespace nav2_navfn_planner
 // whole width of a narrow hallway as equally undesirable and thus
 // will not plan paths down the center.
 
-#define COST_NEUTRAL 50  // Set this to "open space" value
-#define COST_FACTOR 0.8  // Used for translating costs in NavFn::setCostmap()
+//#define COST_NEUTRAL 50  // Set this to "open space" value
+//#define COST_FACTOR 0.8  // Used for translating costs in NavFn::setCostmap()
 
 // Define the cost type in the case that it is not set. However, this allows
 // clients to modify it without changing the file. Arguably, it is better to require it to
@@ -108,7 +108,9 @@ public:
    * @param nx The x size of the map
    * @param ny The y size of the map
    */
-  NavFn(int nx, int ny);
+  NavFn(int nx, int ny, int cost_neutral=50, double cost_factor=0.8);
+  int cost_neutral_;
+  double cost_factor_;
 
   ~NavFn();
 
