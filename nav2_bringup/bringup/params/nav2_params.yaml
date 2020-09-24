@@ -251,6 +251,8 @@ planner_server:
       tolerance: 0.5
       use_astar: false
       allow_unknown: true
+      cost_neutral: 50
+      cost_factor: 0.8
 
 planner_server_rclcpp_node:
   ros__parameters:

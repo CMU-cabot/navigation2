@@ -81,11 +81,16 @@ NavfnPlanner::configure(
   node->get_parameter(name + ".use_astar", use_astar_);
   declare_parameter_if_not_declared(node, name + ".allow_unknown", rclcpp::ParameterValue(true));
   node->get_parameter(name + ".allow_unknown", allow_unknown_);
+  declare_parameter_if_not_declared(node, name + ".cost_neutral", rclcpp::ParameterValue(50));
+  node->get_parameter(name + ".cost_neutral", cost_neutral_);
+  declare_parameter_if_not_declared(node, name + ".cost_factor", rclcpp::ParameterValue(0.8));
+  node->get_parameter(name + ".cost_factor", cost_factor_);
 
   // Create a planner based on the new costmap size
   planner_ = std::make_unique<NavFn>(
     costmap_->getSizeInCellsX(),
-    costmap_->getSizeInCellsY());
+    costmap_->getSizeInCellsY(),
+    cost_neutral_, cost_factor_);
 }
 
 void

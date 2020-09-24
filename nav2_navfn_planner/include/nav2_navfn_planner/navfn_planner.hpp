@@ -140,6 +140,9 @@ protected:
 
   // Whether to use the astar planner or default dijkstras
   bool use_astar_;
+
+  int cost_neutral_;
+  double cost_factor_;
 };
 
 }  // namespace nav2_navfn_planner
