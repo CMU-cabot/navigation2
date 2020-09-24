@@ -223,7 +223,7 @@ NavfnPlanner::makePlan(
   if (use_astar_) {
     planner_->calcNavFnAstar();
   } else {
-    planner_->calcNavFnDijkstra(true);
+    planner_->calcNavFnDijkstra(false);
   }
 
   double resolution = costmap_->getResolution();
