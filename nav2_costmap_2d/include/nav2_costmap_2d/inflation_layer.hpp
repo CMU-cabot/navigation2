@@ -124,6 +124,9 @@ public:
   }
 
 protected:
+  rcl_interfaces::msg::SetParametersResult
+  param_set_callback(const std::vector<rclcpp::Parameter> params);
+
   void onFootprintChanged() override;
 
 private:
@@ -193,6 +196,8 @@ private:
   // Indicates that the entire costmap should be reinflated next time around.
   bool need_reinflation_;
   mutex_t * access_;
+
+  rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr callback_handler_;
 };
 
 }  // namespace nav2_costmap_2d

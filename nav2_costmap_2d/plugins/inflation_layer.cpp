@@ -98,6 +98,9 @@ InflationLayer::onInitialize()
     node->get_parameter(name_ + "." + "cost_scaling_factor", cost_scaling_factor_);
     node->get_parameter(name_ + "." + "inflate_unknown", inflate_unknown_);
     node->get_parameter(name_ + "." + "inflate_around_unknown", inflate_around_unknown_);
+    callback_handler_ = node->add_on_set_parameters_callback(
+      std::bind(&InflationLayer::param_set_callback, this, std::placeholders::_1)
+      );
   }
 
   current_ = true;
@@ -149,6 +152,46 @@ InflationLayer::updateBounds(
     *max_x = std::max(tmp_max_x, *max_x) + inflation_radius_;
     *max_y = std::max(tmp_max_y, *max_y) + inflation_radius_;
   }
+}
+
+rcl_interfaces::msg::SetParametersResult
+InflationLayer::param_set_callback(const std::vector<rclcpp::Parameter> params){
+  auto node = node_.lock();
+
+  RCLCPP_INFO(node->get_logger(), "InflationLayer::param_set_callback");
+  auto results = std::make_shared<rcl_interfaces::msg::SetParametersResult>();
+
+  for(auto&& param : params){
+    RCLCPP_INFO(node->get_logger(), "change param %s", param.get_name().c_str());
+    if(!node->has_parameter(param.get_name())){
+      continue;
+    }
+    if(param.get_name() == name_ + ".enabled"){
+      enabled_ = param.as_bool();
+      need_reinflation_ = true;
+    }
+    if(param.get_name() == name_ + ".inflation_radius"){
+      inflation_radius_ = param.as_double();
+      cell_inflation_radius_ = cellDistance(inflation_radius_);
+      need_reinflation_ = true;
+    }
+    if(param.get_name() == name_ + ".cost_scaling_factor"){
+      cost_scaling_factor_ = param.as_double();
+      need_reinflation_ = true;
+    }
+    if(param.get_name() == name_ + ".inflate_unknown"){
+      inflate_unknown_ = param.as_bool();
+      need_reinflation_ = true;
+    }
+    if(param.get_name() == name_ + ".inflate_around_unknown"){
+      inflate_around_unknown_ = param.as_bool();
+      need_reinflation_ = true;
+    }
+  }
+  computeCaches();
+  results->successful = true;
+  results->reason = "";
+  return *results;
 }
 
 void
