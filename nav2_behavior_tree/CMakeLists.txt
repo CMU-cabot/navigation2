@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.5)
 project(nav2_behavior_tree CXX)
 
 find_package(ament_cmake REQUIRED)
+find_package(ament_index_cpp REQUIRED)
 find_package(nav2_common REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_action REQUIRED)
@@ -27,6 +28,7 @@ include_directories(
 set(library_name ${PROJECT_NAME})
 
 set(dependencies
+  ament_index_cpp
   rclcpp
   rclcpp_action
   rclcpp_lifecycle
