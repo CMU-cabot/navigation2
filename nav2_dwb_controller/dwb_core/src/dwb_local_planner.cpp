@@ -503,11 +503,13 @@ DWBLocalPlanner::transformGlobalPlan(
 
   // Find the first pose in the end of the plan that's further than sq_transform_end_threshold
   // from the robot
-  auto transformation_end = std::find_if(
-    transformation_begin, end(global_plan_.poses),
+  auto transformation_rend = std::find_if(
+    rbegin(global_plan_.poses), std::make_reverse_iterator(transformation_begin+1),
     [&](const auto & global_plan_pose) {
-      return getSquareDistance(robot_pose.pose, global_plan_pose) > sq_transform_end_threshold;
+      return getSquareDistance(robot_pose.pose, global_plan_pose) < sq_transform_end_threshold;
     });
+
+  auto transformation_end = (transformation_rend+1).base();
 
   // Transform the near part of the global plan into the robot's frame of reference.
   nav_2d_msgs::msg::Path2D transformed_plan;
