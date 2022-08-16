@@ -269,7 +269,7 @@ StaticLayer::interpretValue(unsigned char value)
 void
 StaticLayer::incomingMap(const nav_msgs::msg::OccupancyGrid::SharedPtr new_map)
 {
-  std::lock_guard<Costmap2D::mutex_t> guard(*getMutex());
+  //std::lock_guard<Costmap2D::mutex_t> guard(*getMutex());
   if (!map_received_) {
     map_received_ = true;
     processMap(*new_map);
