@@ -138,7 +138,10 @@ public:
     addStaticLayer(*layers_, *tf_buffer_, shared_from_this(), slayer, callback_group_);
 
     while (!slayer->isCurrent()) {
-      rclcpp::spin_some(this->get_node_base_interface());
+      for (int i = 0; i < 100; i++) {
+        rclcpp::spin_some(this->get_node_base_interface());
+      }
+      layers_->updateMap(0, 0, 0);
     }
     // Add Inflation Layer
     std::shared_ptr<nav2_costmap_2d::InflationLayer> ilayer = nullptr;

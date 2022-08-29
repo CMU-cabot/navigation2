@@ -79,7 +79,9 @@ public:
   void initNode(std::vector<rclcpp::Parameter> parameters);
   void initNode(double inflation_radius);
 
-  void waitForMap(std::shared_ptr<nav2_costmap_2d::StaticLayer> & slayer);
+  void waitForMap(
+    std::shared_ptr<nav2_costmap_2d::StaticLayer> & slayer,
+    nav2_costmap_2d::LayeredCostmap & layers);
 
 protected:
   nav2_util::LifecycleNode::SharedPtr node_;
@@ -108,10 +110,15 @@ std::vector<Point> TestNode::setRadii(
   return polygon;
 }
 
-void TestNode::waitForMap(std::shared_ptr<nav2_costmap_2d::StaticLayer> & slayer)
+void TestNode::waitForMap(
+  std::shared_ptr<nav2_costmap_2d::StaticLayer> & slayer,
+  nav2_costmap_2d::LayeredCostmap & layers)
 {
   while (!slayer->isCurrent()) {
-    rclcpp::spin_some(node_->get_node_base_interface());
+    for (int i = 0; i < 100; i++) {
+      rclcpp::spin_some(node_->get_node_base_interface());
+    }
+    layers.updateMap(0, 0, 0);
   }
 }
 
@@ -466,7 +473,7 @@ TEST_F(TestNode, testInflation)
   layers.setFootprint(polygon);
 
   nav2_costmap_2d::Costmap2D * costmap = layers.getCostmap();
-  waitForMap(slayer);
+  waitForMap(slayer, layers);
 
   layers.updateMap(0, 0, 0);
   // printMap(*costmap);
@@ -544,7 +551,7 @@ TEST_F(TestNode, testInflation2)
 
   layers.setFootprint(polygon);
 
-  waitForMap(slayer);
+  waitForMap(slayer, layers);
 
   // Creat a small L-Shape all at once
   addObservation(olayer, 1, 1, MAX_Z);

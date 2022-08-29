@@ -276,11 +276,6 @@ StaticLayer::interpretValue(unsigned char value)
 void
 StaticLayer::incomingMap(const nav_msgs::msg::OccupancyGrid::SharedPtr new_map)
 {
-  if (!map_received_) {
-    processMap(*new_map);
-    map_received_ = true;
-    return;
-  }
   std::lock_guard<Costmap2D::mutex_t> guard(*getMutex());
   map_buffer_ = new_map;
 }
@@ -332,16 +327,16 @@ StaticLayer::updateBounds(
   double * max_x,
   double * max_y)
 {
-  if (!map_received_) {
-    return;
-  }
-
   std::lock_guard<Costmap2D::mutex_t> guard(*getMutex());
 
   // If there is a new available map, load it.
   if (map_buffer_) {
     processMap(*map_buffer_);
     map_buffer_ = nullptr;
+    map_received_ = true;
+  }
+  if (!map_received_) {
+    return;
   }
 
   if (!layered_costmap_->isRolling() ) {
