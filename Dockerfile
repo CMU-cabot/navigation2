@@ -49,7 +49,7 @@ RUN apt-get update && \
       ros-$ROS_DISTRO-rmw-cyclonedds-cpp \
     && pip3 install \
       git+https://github.com/ruffsl/colcon-cache.git@13c424c3a455ae04d1a4176a54c49a9d20c9dca0 \
-    && rosdep update \
+    && rosdep update --include-eol-distros \
     && rm -rf /var/lib/apt/lists/*
 
 # install underlay dependencies
