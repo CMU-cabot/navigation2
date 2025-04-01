@@ -214,7 +214,7 @@ LifecycleManager::changeStateForNode(const std::string & node_name, std::uint8_t
   message(transition_label_map_[transition] + node_name);
 
   if (!node_map_[node_name]->change_state(transition) ||
-    !(node_map_[node_name]->get_state(bond_timeout_) == transition_state_map_[transition]))
+    !(node_map_[node_name]->get_state(std::chrono::duration_cast<std::chrono::seconds>(bond_timeout_)) == transition_state_map_[transition]))
   {
     RCLCPP_ERROR(get_logger(), "Failed to change state for node: %s", node_name.c_str());
     return false;
@@ -474,7 +474,7 @@ LifecycleManager::checkBondRespawnConnection()
     }
 
     try {
-      node_map_[node_name]->get_state(bond_timeout_);  // Only won't throw if the server exists
+      node_map_[node_name]->get_state(std::chrono::duration_cast<std::chrono::seconds>(bond_timeout_));  // Only won't throw if the server exists
       live_servers++;
     } catch (...) {
       break;
