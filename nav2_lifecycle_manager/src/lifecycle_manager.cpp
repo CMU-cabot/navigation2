@@ -238,29 +238,33 @@ LifecycleManager::changeStateForAllNodes(std::uint8_t transition, bool hard_chan
     transition == Transition::TRANSITION_ACTIVATE)
   {
     for (auto & node_name : node_names_) {
-      try {
-        if (!changeStateForNode(node_name, transition) && !hard_change) {
-          return false;
+      while(true) {
+        try {
+          if (!changeStateForNode(node_name, transition) && !hard_change) {
+            return false;
+          }
+          break;
+        } catch (const std::runtime_error & e) {
+          RCLCPP_ERROR(
+            get_logger(),
+            "Failed to change state for node: %s. Exception: %s.", node_name.c_str(), e.what());
         }
-      } catch (const std::runtime_error & e) {
-        RCLCPP_ERROR(
-          get_logger(),
-          "Failed to change state for node: %s. Exception: %s.", node_name.c_str(), e.what());
-        return false;
       }
     }
   } else {
     std::vector<std::string>::reverse_iterator rit;
     for (rit = node_names_.rbegin(); rit != node_names_.rend(); ++rit) {
-      try {
-        if (!changeStateForNode(*rit, transition) && !hard_change) {
-          return false;
+      while(true) {
+        try {
+          if (!changeStateForNode(*rit, transition) && !hard_change) {
+            return false;
+          }
+          break;
+        } catch (const std::runtime_error & e) {
+          RCLCPP_ERROR(
+            get_logger(),
+            "Failed to change state for node: %s. Exception: %s.", (*rit).c_str(), e.what());
         }
-      } catch (const std::runtime_error & e) {
-        RCLCPP_ERROR(
-          get_logger(),
-          "Failed to change state for node: %s. Exception: %s.", (*rit).c_str(), e.what());
-        return false;
       }
     }
   }
