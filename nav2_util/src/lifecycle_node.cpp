@@ -34,6 +34,9 @@ LifecycleNode::LifecycleNode(
   this->set_parameter(
     rclcpp::Parameter(
       bond::msg::Constants::DISABLE_HEARTBEAT_TIMEOUT_PARAM, true));
+  this->declare_parameter("bond_timeout", 4.0);
+  this->declare_parameter("bond_connect_timeout", 10.0);
+  this->declare_parameter("bond_heartbeat_period", 0.1);
 
   printLifecycleNodeNotification();
 
@@ -62,9 +65,14 @@ void LifecycleNode::createBond()
     this->get_name(),
     shared_from_this());
 
-  bond_->setHeartbeatPeriod(1.0);
-  bond_->setConnectTimeout(90.0);
-  bond_->setHeartbeatTimeout(90.0);
+  double bond_connect_timeout, bond_timeout, bond_heartbeat_period;
+  get_parameter("bond_timeout", bond_timeout);
+  get_parameter("bond_connect_timeout", bond_connect_timeout);
+  get_parameter("bond_heartbeat_period", bond_heartbeat_period);
+
+  bond_->setHeartbeatTimeout(bond_timeout);
+  bond_->setConnectTimeout(bond_connect_timeout);
+  bond_->setHeartbeatPeriod(bond_heartbeat_period);
   bond_->start();
 }
 

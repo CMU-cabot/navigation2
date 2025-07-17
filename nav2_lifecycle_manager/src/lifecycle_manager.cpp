@@ -42,6 +42,10 @@ LifecycleManager::LifecycleManager(const rclcpp::NodeOptions & options)
   declare_parameter("node_names", rclcpp::PARAMETER_STRING_ARRAY);
   declare_parameter("autostart", rclcpp::ParameterValue(false));
   declare_parameter("bond_timeout", 4.0);
+  declare_parameter("bond_connect_timeout", 10.0);
+  declare_parameter("bond_heartbeat_period", 0.1);
+  declare_parameter("get_state_timeout", 2.0);
+  declare_parameter("change_state_timeout", 5.0);
   declare_parameter("bond_respawn_max_duration", 10.0);
   declare_parameter("attempt_respawn_reconnection", true);
 
@@ -53,6 +57,13 @@ LifecycleManager::LifecycleManager(const rclcpp::NodeOptions & options)
   get_parameter("bond_timeout", bond_timeout_s);
   bond_timeout_ = std::chrono::duration_cast<std::chrono::milliseconds>(
     std::chrono::duration<double>(bond_timeout_s));
+  get_parameter("bond_connect_timeout", bond_connect_timeout_);
+  get_parameter("bond_heartbeat_period", bond_heartbeat_period_);
+  double get_state_timeout_s, change_state_timeout_s;
+  get_parameter("get_state_timeout", get_state_timeout_s);
+  get_parameter("change_state_timeout", change_state_timeout_s);
+  get_state_timeout_ = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::duration<double>(get_state_timeout_s));
+  change_state_timeout_ = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::duration<double>(change_state_timeout_s));
 
   double respawn_timeout_s;
   get_parameter("bond_respawn_max_duration", respawn_timeout_s);
@@ -188,9 +199,9 @@ LifecycleManager::createBondConnection(const std::string & node_name)
   if (bond_map_.find(node_name) == bond_map_.end() && bond_timeout_.count() > 0.0) {
     bond_map_[node_name] =
       std::make_shared<bond::Bond>("bond", node_name, shared_from_this());
-    bond_map_[node_name]->setConnectTimeout(timeout_s);
+    bond_map_[node_name]->setConnectTimeout(bond_connect_timeout_);
     bond_map_[node_name]->setHeartbeatTimeout(timeout_s);
-    bond_map_[node_name]->setHeartbeatPeriod(1.0);
+    bond_map_[node_name]->setHeartbeatPeriod(bond_heartbeat_period_);
     bond_map_[node_name]->start();
     if (
       !bond_map_[node_name]->waitUntilFormed(
@@ -214,8 +225,8 @@ LifecycleManager::changeStateForNode(const std::string & node_name, std::uint8_t
 {
   message(transition_label_map_[transition] + node_name);
 
-  if (!node_map_[node_name]->change_state(transition, std::chrono::duration_cast<std::chrono::seconds>(bond_timeout_)) ||
-    !(node_map_[node_name]->get_state(std::chrono::duration_cast<std::chrono::seconds>(bond_timeout_)) == transition_state_map_[transition]))
+  if (!node_map_[node_name]->change_state(transition, change_state_timeout_) ||
+    !(node_map_[node_name]->get_state(get_state_timeout_) == transition_state_map_[transition]))
   {
     RCLCPP_ERROR(get_logger(), "Failed to change state for node: %s", node_name.c_str());
     return false;
@@ -479,7 +490,7 @@ LifecycleManager::checkBondRespawnConnection()
     }
 
     try {
-      node_map_[node_name]->get_state(std::chrono::duration_cast<std::chrono::seconds>(bond_timeout_));  // Only won't throw if the server exists
+      node_map_[node_name]->get_state(get_state_timeout_);
       live_servers++;
     } catch (...) {
       break;
