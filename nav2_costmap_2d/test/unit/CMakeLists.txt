@@ -57,7 +57,10 @@ target_link_libraries(denoise_layer_test
   ${PROJECT_NAME}::layers
 )
 
-ament_add_gtest(obstacle_layer_test obstacle_layer_test.cpp)
+ament_add_gtest(obstacle_layer_test obstacle_layer_test.cpp
+  # Prefer the library being tested over a sourced installation of this package.
+  ENV "LD_LIBRARY_PATH=$<TARGET_FILE_DIR:layers>:$ENV{LD_LIBRARY_PATH}"
+)
 target_link_libraries(obstacle_layer_test
   ${PROJECT_NAME}::nav2_costmap_2d_core
   layers

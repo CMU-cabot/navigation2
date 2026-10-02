@@ -39,6 +39,7 @@
 #define NAV2_COSTMAP_2D__OBSTACLE_LAYER_HPP_
 
 #include <memory>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -231,6 +232,9 @@ protected:
 
   /// @brief Used to project laser scans into point clouds
   laser_geometry::LaserProjection projector_;
+  // MessageFilter delivers callbacks from both the sensor and TF listener threads.
+  // LaserProjection mutates its angle cache, even for otherwise const scans.
+  std::mutex projector_mutex_;
   /// @brief Used for the observation message filters
   std::vector<std::shared_ptr<message_filters::SubscriberBase<rclcpp_lifecycle::LifecycleNode>>>
   observation_subscribers_;

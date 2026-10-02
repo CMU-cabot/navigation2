@@ -333,22 +333,25 @@ ObstacleLayer::laserScanCallback(
   cloud.header = message->header;
 
   // project the scan into a point cloud
-  try {
-    projector_.transformLaserScanToPointCloud(message->header.frame_id, *message, cloud, *tf_);
-  } catch (tf2::TransformException & ex) {
-    RCLCPP_WARN(
-      logger_,
-      "High fidelity enabled, but TF returned a transform exception to frame %s: %s",
-      global_frame_.c_str(),
-      ex.what());
-    projector_.projectLaser(*message, cloud);
-  } catch (std::runtime_error & ex) {
-    RCLCPP_WARN(
-      logger_,
-      "transformLaserScanToPointCloud error, it seems the message from laser is malformed."
-      " Ignore this message. what(): %s",
-      ex.what());
-    return;
+  {
+    std::lock_guard<std::mutex> lock(projector_mutex_);
+    try {
+      projector_.transformLaserScanToPointCloud(message->header.frame_id, *message, cloud, *tf_);
+    } catch (tf2::TransformException & ex) {
+      RCLCPP_WARN(
+        logger_,
+        "High fidelity enabled, but TF returned a transform exception to frame %s: %s",
+        global_frame_.c_str(),
+        ex.what());
+      projector_.projectLaser(*message, cloud);
+    } catch (std::runtime_error & ex) {
+      RCLCPP_WARN(
+        logger_,
+        "transformLaserScanToPointCloud error, it seems the message from laser is malformed."
+        " Ignore this message. what(): %s",
+        ex.what());
+      return;
+    }
   }
 
   // buffer the point cloud
@@ -377,21 +380,24 @@ ObstacleLayer::laserScanValidInfCallback(
   cloud.header = message.header;
 
   // project the scan into a point cloud
-  try {
-    projector_.transformLaserScanToPointCloud(message.header.frame_id, message, cloud, *tf_);
-  } catch (tf2::TransformException & ex) {
-    RCLCPP_WARN(
-      logger_,
-      "High fidelity enabled, but TF returned a transform exception to frame %s: %s",
-      global_frame_.c_str(), ex.what());
-    projector_.projectLaser(message, cloud);
-  } catch (std::runtime_error & ex) {
-    RCLCPP_WARN(
-      logger_,
-      "transformLaserScanToPointCloud error, it seems the message from laser is malformed."
-      " Ignore this message. what(): %s",
-      ex.what());
-    return;
+  {
+    std::lock_guard<std::mutex> lock(projector_mutex_);
+    try {
+      projector_.transformLaserScanToPointCloud(message.header.frame_id, message, cloud, *tf_);
+    } catch (tf2::TransformException & ex) {
+      RCLCPP_WARN(
+        logger_,
+        "High fidelity enabled, but TF returned a transform exception to frame %s: %s",
+        global_frame_.c_str(), ex.what());
+      projector_.projectLaser(message, cloud);
+    } catch (std::runtime_error & ex) {
+      RCLCPP_WARN(
+        logger_,
+        "transformLaserScanToPointCloud error, it seems the message from laser is malformed."
+        " Ignore this message. what(): %s",
+        ex.what());
+      return;
+    }
   }
 
   // buffer the point cloud

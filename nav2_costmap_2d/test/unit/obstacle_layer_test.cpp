@@ -14,7 +14,12 @@
 
 #include <gtest/gtest.h>
 
+#include <atomic>
+#include <cmath>
 #include <cstdio>
+#include <limits>
+#include <thread>
+#include <utility>
 #include <memory>
 #include <string>
 
@@ -23,6 +28,8 @@
 #include "nav2_costmap_2d/obstacle_layer.hpp"
 #include "../testing_helper.hpp"
 #include "tf2_ros/buffer.hpp"
+#include "tf2_ros/transform_listener.h"
+#include "sensor_msgs/point_cloud2_iterator.hpp"
 
 
 class RclCppFixture
@@ -408,3 +415,83 @@ TEST_F(ObstacleLayerTest, testClearDiagonalDistance) {
     countValues(*obstacle_layer_, nav2_costmap_2d::LETHAL_OBSTACLE),
     20 * 20 - 8);
 }
+
+// MessageFilter may deliver a ready scan on the subscription thread while a
+// previously queued scan is delivered by the TF listener. Both use one layer.
+class ConcurrentProjectionLayer : public nav2_costmap_2d::ObstacleLayer
+{
+public:
+  explicit ConcurrentProjectionLayer(tf2_ros::Buffer & buffer)
+  {
+    tf_ = &buffer;
+    global_frame_ = "scan";
+  }
+};
+
+class ObstacleLayerProjection
+  : public ::testing::TestWithParam<std::pair<bool, bool>> {};
+
+TEST_P(ObstacleLayerProjection, concurrentDifferentScanGeometries)
+{
+  auto node = std::make_shared<TestLifecycleNode>("concurrent_projection_test");
+  tf2_ros::Buffer tf(node->get_clock());
+  tf2_ros::TransformListener listener(tf);
+  ConcurrentProjectionLayer layer(tf);
+  std::atomic<int> ready{0};
+  std::atomic<int> bad_clouds{0};
+  auto project = [&](size_t count, float angle_min, bool valid_inf) {
+      auto buffer = std::make_shared<nav2_costmap_2d::ObservationBuffer>(
+        node, "scan", 0.0, 0.0, -1.0, 1.0, 6.0, 0.0, 6.0, 0.0,
+        tf, "scan", "scan", tf2::durationFromSec(0.0));
+      auto scan = std::make_shared<sensor_msgs::msg::LaserScan>();
+      scan->header.frame_id = "scan";
+      scan->angle_min = angle_min;
+      scan->angle_increment = 0.00174F;
+      scan->angle_max = angle_min + (count - 1) * scan->angle_increment;
+      scan->range_min = 0.05F;
+      scan->range_max = 5.0F;
+      scan->ranges.assign(count, valid_inf ? std::numeric_limits<float>::infinity() : 2.0F);
+      const float range = valid_inf ? scan->range_max - 0.0001F : 2.0F;
+      ++ready;
+      while (ready.load() < 2) {
+        std::this_thread::yield();
+      }
+      for (int iteration = 0; iteration < 1000; ++iteration) {
+        scan->header.stamp = node->now();
+        if (valid_inf) {
+          layer.laserScanValidInfCallback(scan, buffer);
+        } else {
+          layer.laserScanCallback(scan, buffer);
+        }
+        std::vector<nav2_costmap_2d::Observation> observations;
+        buffer->getObservations(observations);
+        if (observations.size() != 1 || observations[0].cloud_->width != count) {
+          ++bad_clouds;
+          continue;
+        }
+        const auto & cloud = *observations[0].cloud_;
+        sensor_msgs::PointCloud2ConstIterator<float> x(cloud, "x");
+        sensor_msgs::PointCloud2ConstIterator<float> y(cloud, "y");
+        for (size_t index = 0; index < count; ++index, ++x, ++y) {
+          const double angle = scan->angle_min + index * static_cast<double>(scan->angle_increment);
+          if (!std::isfinite(*x) || !std::isfinite(*y) ||
+            std::abs(*x - range * std::cos(angle)) > 1.0e-5 ||
+            std::abs(*y - range * std::sin(angle)) > 1.0e-5)
+          {
+            ++bad_clouds;
+            break;
+          }
+        }
+      }
+    };
+  std::thread first_scan(project, 808, -0.70274F, GetParam().first);
+  std::thread second_scan(project, 706, -0.614F, GetParam().second);
+  first_scan.join();
+  second_scan.join();
+  EXPECT_EQ(bad_clouds.load(), 0);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+  ScanCallbackKinds, ObstacleLayerProjection,
+  ::testing::Values(
+    std::make_pair(false, false), std::make_pair(true, true), std::make_pair(false, true)));
